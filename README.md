@@ -1,4 +1,4 @@
-# iofx: Automated I/O Effect Detection for Python Functions
+# iofx: I/O Effect Detection for Python Functions
 
 `iofx` is a Python library that provides automated detection and validation of file I/O effects for
 functions. It leverages Pydantic for type checking and effect validation.
