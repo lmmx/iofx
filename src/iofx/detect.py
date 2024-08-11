@@ -2,10 +2,12 @@ from typing import Any, Generic, Literal, ParamSpec, TypeVar
 from collections.abc import Callable
 from pydantic import BaseModel, Field, model_validator, TypeAdapter, ValidationError
 from pydantic.types import NewPath, FilePath
-from inspect import signature, Parameter
+from inspect import signature
 from pathlib import Path
 
-__all__ = ("FileEffect", "ParameterInfo", "FunctionModel", "create_function_model")
+from .param import ParameterInfo, extract_function_info
+
+__all__ = ("FileEffect", "detect_io_effects", "FunctionModel", "create_function_model")
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -13,13 +15,20 @@ R = TypeVar("R")
 
 class FileEffect(BaseModel):
     operation: Literal["read", "write", "append"]
-    path_param: str
+    param: str
 
 
-class ParameterInfo(BaseModel):
-    name: str
-    type: Any
-    default: Any = Field(default=Parameter.empty)
+def detect_io_effects(parameters: list[ParameterInfo]) -> list[FileEffect]:
+    effect_map = {
+        FilePath: "read",
+        NewPath: "write",
+        Path: "append",
+    }
+    return [
+        FileEffect(operation=effect_map[param.type], param=param.name)
+        for param in parameters
+        if param.type in effect_map
+    ]
 
 
 class FunctionModel(BaseModel, Generic[P, R]):
@@ -30,26 +39,8 @@ class FunctionModel(BaseModel, Generic[P, R]):
 
     @model_validator(mode="after")
     def populate_function_info(self) -> "FunctionModel":
-        sig = signature(self.func)
-        self.parameters = []
-        for name, param in sig.parameters.items():
-            param_type = (
-                param.annotation if param.annotation != Parameter.empty else Any
-            )
-            info = ParameterInfo(name=name, type=param_type, default=param.default)
-            self.parameters.append(info)
-
-            # Automatically detect file effects based on parameter types
-            if param_type == FilePath:
-                self.effects.append(FileEffect(operation="read", path_param=name))
-            elif param_type == NewPath:
-                self.effects.append(FileEffect(operation="write", path_param=name))
-            elif param_type is Path:
-                self.effects.append(FileEffect(operation="append", path_param=name))
-
-        self.return_type = (
-            sig.return_annotation if sig.return_annotation != Parameter.empty else Any
-        )
+        self.parameters, self.return_type = extract_function_info(self.func)
+        self.effects = detect_io_effects(self.parameters)
         return self
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
@@ -62,12 +53,12 @@ class FunctionModel(BaseModel, Generic[P, R]):
         bound_args.apply_defaults()
 
         for effect in self.effects:
-            if effect.path_param not in bound_args.arguments:
+            if effect.param not in bound_args.arguments:
                 raise ValueError(
-                    f"Parameter {effect.path_param} not found in function arguments",
+                    f"Parameter {effect.param} not found in function arguments",
                 )
 
-            path = bound_args.arguments[effect.path_param]
+            path = bound_args.arguments[effect.param]
             if effect.operation == "read":
                 try:
                     TypeAdapter(FilePath).validate_python(path)
