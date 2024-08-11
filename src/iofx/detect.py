@@ -47,8 +47,8 @@ class FunctionModel(BaseModel, Generic[P, R]):
             elif param_type is Path:
                 self.effects.append(FileEffect(operation="append", path_param=name))
 
-        self.return_type = next(
-            sig.return_annotation if sig.return_annotation != Parameter.empty else Any,
+        self.return_type = (
+            sig.return_annotation if sig.return_annotation != Parameter.empty else Any
         )
         return self
 
