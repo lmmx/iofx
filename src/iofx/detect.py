@@ -1,7 +1,11 @@
-from typing import Any, Callable, Generic, Literal, ParamSpec, TypeVar
-from pydantic import BaseModel, Field, model_validator, TypeAdapter, NewPath, FilePath
+from typing import Any, Generic, Literal, ParamSpec, TypeVar
+from collections.abc import Callable
+from pydantic import BaseModel, Field, model_validator, TypeAdapter, ValidationError
+from pydantic.types import NewPath, FilePath
 from inspect import signature, Parameter
 from pathlib import Path
+
+__all__ = ("FileEffect", "ParameterInfo", "FunctionModel", "create_function_model")
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -32,13 +36,8 @@ class FunctionModel(BaseModel, Generic[P, R]):
             param_type = (
                 param.annotation if param.annotation != Parameter.empty else Any
             )
-            self.parameters.append(
-                ParameterInfo(
-                    name=name,
-                    type=param_type,
-                    default=param.default,
-                )
-            )
+            info = ParameterInfo(name=name, type=param_type, default=param.default)
+            self.parameters.append(info)
 
             # Automatically detect file effects based on parameter types
             if param_type == FilePath:
@@ -48,8 +47,8 @@ class FunctionModel(BaseModel, Generic[P, R]):
             elif param_type is Path:
                 self.effects.append(FileEffect(operation="append", path_param=name))
 
-        self.return_type = (
-            sig.return_annotation if sig.return_annotation != Parameter.empty else Any
+        self.return_type = next(
+            sig.return_annotation if sig.return_annotation != Parameter.empty else Any,
         )
         return self
 
@@ -65,19 +64,19 @@ class FunctionModel(BaseModel, Generic[P, R]):
         for effect in self.effects:
             if effect.path_param not in bound_args.arguments:
                 raise ValueError(
-                    f"Parameter {effect.path_param} not found in function arguments"
+                    f"Parameter {effect.path_param} not found in function arguments",
                 )
 
             path = bound_args.arguments[effect.path_param]
             if effect.operation == "read":
                 try:
                     TypeAdapter(FilePath).validate_python(path)
-                except:
+                except ValidationError:
                     raise ValueError(f"Cannot read from non-existent file {path}")
             elif effect.operation == "write":
                 try:
                     TypeAdapter(NewPath).validate_python(path)
-                except:
+                except ValidationError:
                     raise ValueError(f"Cannot write to existing file {path}")
 
 

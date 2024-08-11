@@ -1,19 +1,20 @@
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
 [project]
 name = "iofx"
 version = "0.1.0"
 description = "IO effect handlers for Python"
 authors = [
-    {name = "Louis Maddox", email = "louismmx@gmail.com"},
+  {name = "Louis Maddox", email = "louismmx@gmail.com"}
 ]
-dependencies = []
+dependencies = [
+  "pydantic>=2.8.2"
+]
 requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
-
-[build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
-
 
 [tool.pdm]
 distribution = true

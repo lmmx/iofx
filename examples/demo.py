@@ -1,8 +1,9 @@
-
+from iofx import create_function_model
+from pydantic import FilePath, NewPath
 
 
 def process_file(input_path: FilePath, output_path: NewPath) -> None:
-    with open(input_path, "r") as infile, open(output_path, "w") as outfile:
+    with open(input_path) as infile, open(output_path, "w") as outfile:
         outfile.write(infile.read().upper())
 
 
@@ -12,7 +13,8 @@ process_file_model = create_function_model(process_file)
 # Usage
 try:
     result = process_file_model(
-        input_path="existing_input.txt", output_path="new_output.txt"
+        input_path="existing_input.txt",
+        output_path="new_output.txt",
     )
     print("File processed successfully")
 except ValueError as e:
