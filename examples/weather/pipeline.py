@@ -49,7 +49,7 @@ def extract_station_data(config: Config, station: str) -> None:
 def merge_station_data(config: Config) -> None:
     dfs = [
         pl.read_csv(config.output_dir / f"processed_{station}.csv").with_columns(
-            pl.lit(station).alias("station")
+            pl.lit(station).alias("station"),
         )
         for station in config.stations
     ]
@@ -65,7 +65,7 @@ def analyze_data(config: Config) -> AnalysisResult:
         min_temperature=df["temperature"].min(),
     )
     pl.DataFrame([analysis.dict()]).write_json(
-        config.output_dir / "analysis_results.json"
+        config.output_dir / "analysis_results.json",
     )
     return analysis
 
